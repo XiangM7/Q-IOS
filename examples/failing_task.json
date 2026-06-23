@@ -1,0 +1,8 @@
+{
+  "objective": "run fail simulation",
+  "priority": 7,
+  "constraints": {
+    "sandbox_required": true
+  },
+  "fallback": "fallback_patch"
+}

@@ -1,0 +1,8 @@
+{
+  "objective": "analyze project files",
+  "priority": 8,
+  "constraints": {
+    "sandbox_required": false
+  },
+  "fallback": "fallback_patch"
+}

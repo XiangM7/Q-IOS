@@ -1,0 +1,35 @@
+from __future__ import annotations
+
+from qios.models import PatchType, PhiToken, StructuredJobModel, TokenState
+
+
+class PhiTokenEngine:
+    def create_token(self, structured_job: StructuredJobModel) -> PhiToken:
+        role = structured_job.roles[0] if structured_job.roles else "default_execution"
+        patch_hint = self._infer_patch_hint(role, structured_job.constraints)
+        phi_modulation = min(1.0, max(0.1, structured_job.priority / 10))
+
+        return PhiToken(
+            task_id=structured_job.task_id,
+            role=role,
+            priority=structured_job.priority,
+            patch_hint=patch_hint,
+            fallback=structured_job.fallback,
+            lifecycle_state=TokenState.PLANNED,
+            phi_modulation=phi_modulation,
+            metadata={
+                "objective": structured_job.objective,
+                "constraints": structured_job.constraints,
+                "entities": structured_job.entities,
+                "output_condition": structured_job.output_condition,
+            },
+        )
+
+    def _infer_patch_hint(self, role: str, constraints: dict[str, object]) -> str | None:
+        if constraints.get("sandbox_required"):
+            return PatchType.SANDBOX.value
+        if role == "analysis":
+            return PatchType.ANALYSIS.value
+        if role == "execution":
+            return PatchType.SANDBOX.value
+        return None
