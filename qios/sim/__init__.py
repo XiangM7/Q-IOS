@@ -6,12 +6,13 @@ from qios.sim.baselines import (
     RetryOnlyBaseline,
     StaticRoutingBaseline,
 )
-from qios.sim.environment import SimulationEnvironment
+from qios.sim.environment import PatchHealth, SimulationEnvironment
 from qios.sim.metrics import SimulationMetrics
 from qios.sim.workload import WorkloadGenerator
 
 __all__ = [
     "DirectExecutionBaseline",
+    "PatchHealth",
     "QIOSSimulationSystem",
     "SimulationRunResult",
     "RetryOnlyBaseline",

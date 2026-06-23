@@ -10,6 +10,8 @@ def test_workload_generation_is_deterministic_with_seed() -> None:
         failure_rate=0.4,
         sandbox_ratio=0.5,
         high_priority_ratio=0.3,
+        no_fallback_ratio=0.2,
+        policy_invalid_ratio=0.2,
         seed=42,
     )
     generator_two = WorkloadGenerator(
@@ -17,6 +19,8 @@ def test_workload_generation_is_deterministic_with_seed() -> None:
         failure_rate=0.4,
         sandbox_ratio=0.5,
         high_priority_ratio=0.3,
+        no_fallback_ratio=0.2,
+        policy_invalid_ratio=0.2,
         seed=42,
     )
 
@@ -30,7 +34,7 @@ def test_metrics_compute_completion_rate_correctly() -> None:
     metrics = SimulationMetrics(system_name="demo")
     metrics.record_task(latency_ms=10.0, completed=True)
     metrics.record_task(latency_ms=12.0, completed=True)
-    metrics.record_task(latency_ms=18.0, completed=False)
+    metrics.record_task(latency_ms=18.0, completed=False, runtime_failed=True)
 
     assert metrics.completion_rate == pytest.approx(2 / 3)
 
@@ -41,3 +45,13 @@ def test_metrics_compute_p95_latency() -> None:
         metrics.record_task(latency_ms=float(latency), completed=True)
 
     assert metrics.p95_latency_ms == pytest.approx(100.0)
+
+
+def test_metrics_compute_policy_and_runtime_rates_safely() -> None:
+    metrics = SimulationMetrics(system_name="demo")
+    metrics.record_task(latency_ms=0.0, completed=False, policy_rejected=True)
+    metrics.record_task(latency_ms=5.0, completed=False, runtime_failed=True, failed_recovery=True)
+
+    assert metrics.policy_rejection_rate == pytest.approx(0.5)
+    assert metrics.runtime_failure_rate == pytest.approx(0.5)
+    assert metrics.recovery_success_rate == pytest.approx(0.0)

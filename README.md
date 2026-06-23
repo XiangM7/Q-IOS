@@ -37,10 +37,21 @@ python -m qios.main reset-state
 ## Simulation and Benchmarking
 
 ```bash
-python -m qios.sim.runner --tasks 100 --failure-rate 0.1 --systems qios,direct,retry_only,static --seed 42
+python -m qios.sim.runner \
+  --tasks 1000 \
+  --failure-rate 0.3 \
+  --fallback-failure-rate 0.15 \
+  --no-fallback-ratio 0.1 \
+  --policy-invalid-ratio 0.05 \
+  --congestion-rate 0.2 \
+  --max-reroutes 3 \
+  --systems qios,direct,retry_only,static \
+  --seed 42
 ```
 
-This benchmark runs one shared synthetic workload across Q-IOS and baseline systems, then compares completion rate, recovery success rate, latency, full restarts, reroutes, and policy rejections.
+This benchmark runs one shared synthetic workload across Q-IOS and baseline systems, then compares completion rate, runtime failure rate, policy rejection rate, recovery success rate, latency, restarts, reroutes, fallback dispatches, quarantines, and reroute exhaustion.
+
+Q-IOS recovery is intentionally bounded. Fallback dispatch can fail, reroutes can be exhausted, no-fallback tasks can terminate unrecovered, and policy-invalid tasks are rejected before runtime execution.
 
 The latest benchmark artifacts are written under:
 

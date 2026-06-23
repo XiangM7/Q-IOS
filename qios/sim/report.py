@@ -15,12 +15,19 @@ def write_metrics_csv(output_dir: Path, metrics: list[SimulationMetrics]) -> Pat
         "total_tasks",
         "completed_tasks",
         "failed_tasks",
+        "runtime_failure_count",
         "recovered_tasks",
+        "failed_recovery_count",
         "full_restart_count",
         "reroute_count",
+        "fallback_dispatch_count",
+        "quarantine_count",
+        "max_reroute_exhausted_count",
         "policy_rejection_count",
         "total_latency_ms",
         "completion_rate",
+        "runtime_failure_rate",
+        "policy_rejection_rate",
         "recovery_success_rate",
         "average_latency_ms",
         "p95_latency_ms",
@@ -69,8 +76,8 @@ def _build_report(settings: dict[str, object], metrics: list[SimulationMetrics])
             "",
             "## Comparison Table",
             "",
-            "| System | Completion Rate | Recovery Success Rate | Avg Latency (ms) | P95 Latency (ms) | Full Restarts | Reroutes | Policy Rejections |",
-            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+            "| System | Completion Rate | Runtime Failure Rate | Policy Rejection Rate | Recovery Success Rate | Failed Recoveries | Full Restarts | Reroutes | Fallback Dispatches | Quarantines | Max Reroute Exhausted | Avg Latency (ms) | P95 Latency (ms) |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
         ]
     )
 
@@ -79,12 +86,17 @@ def _build_report(settings: dict[str, object], metrics: list[SimulationMetrics])
             "| "
             f"{item.system_name} | "
             f"{item.completion_rate:.2%} | "
+            f"{item.runtime_failure_rate:.2%} | "
+            f"{item.policy_rejection_rate:.2%} | "
             f"{item.recovery_success_rate:.2%} | "
-            f"{item.average_latency_ms:.2f} | "
-            f"{item.p95_latency_ms:.2f} | "
+            f"{item.failed_recovery_count} | "
             f"{item.full_restart_count} | "
             f"{item.reroute_count} | "
-            f"{item.policy_rejection_count} |"
+            f"{item.fallback_dispatch_count} | "
+            f"{item.quarantine_count} | "
+            f"{item.max_reroute_exhausted_count} | "
+            f"{item.average_latency_ms:.2f} | "
+            f"{item.p95_latency_ms:.2f} |"
         )
 
     lines.extend(
@@ -93,6 +105,11 @@ def _build_report(settings: dict[str, object], metrics: list[SimulationMetrics])
             "## Interpretation",
             "",
             _build_interpretation(metrics),
+            "",
+            "## Notes",
+            "",
+            "- Q-IOS recovery is bounded by `max_reroutes`, so recovery can fail after repeated fallback or reroute failures.",
+            "- Policy rejections are counted separately from runtime failures and occur before execution begins.",
             "",
         ]
     )
@@ -114,8 +131,10 @@ def _build_interpretation(metrics: list[SimulationMetrics]) -> str:
 
     if qios_metrics is not None:
         statements.append(
-            f"`qios` recovered {qios_metrics.recovered_tasks} tasks with "
-            f"{qios_metrics.reroute_count} reroutes and {qios_metrics.full_restart_count} full restarts."
+            f"`qios` completed {qios_metrics.completed_tasks} of {qios_metrics.total_tasks} tasks, "
+            f"recovered {qios_metrics.recovered_tasks}, "
+            f"failed recovery on {qios_metrics.failed_recovery_count}, "
+            f"and exhausted reroutes {qios_metrics.max_reroute_exhausted_count} times."
         )
 
     return " ".join(statements)
