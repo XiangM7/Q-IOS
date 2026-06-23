@@ -61,6 +61,27 @@ runs/latest/summary.json
 runs/latest/report.md
 ```
 
+## Patent-Aligned Control Plane Features
+
+Q-IOS now includes a patent-aligned control plane layer around the existing runtime path. This adds phi-cache feedback, modulation profiles, local patch arbitration, snapshot packaging, replay-ledger tracking, and rollback anchors without changing the core submit CLI flow.
+
+The simulation runner continues to compare Q-IOS against simpler baselines:
+
+```bash
+python -m qios.sim.runner \
+  --tasks 1000 \
+  --failure-rate 0.3 \
+  --fallback-failure-rate 0.15 \
+  --no-fallback-ratio 0.1 \
+  --policy-invalid-ratio 0.05 \
+  --congestion-rate 0.2 \
+  --max-reroutes 3 \
+  --systems qios,direct,retry_only,static \
+  --seed 42
+```
+
+The benchmark report compares completion rate, runtime failure rate, policy rejection rate, recovery success rate, latency, full restarts, reroutes, fallback dispatches, quarantines, reroute exhaustion, and Q-IOS-specific control plane counters such as phi-cache hits, modulation profiles, arbitration outcomes, snapshots, rollback anchors, replay-ledger events, and local reentry count.
+
 ## Test
 
 ```bash

@@ -8,6 +8,17 @@ class PatchRuntime:
         objective = str(token.metadata.get("objective", "")).lower()
         active_patch = token.assigned_patch or token.patch_hint or PatchType.ANALYSIS.value
 
+        if bool(token.metadata.get("sim_force_failure")):
+            token.lifecycle_state = TokenState.FAILED
+            return ExecutionResult(
+                task_id=token.task_id,
+                token_id=token.token_id,
+                status=TokenState.FAILED,
+                success=False,
+                patch=active_patch,
+                failure_reason="Simulated primary-route failure.",
+            )
+
         if "fail" in objective and active_patch != PatchType.FALLBACK.value:
             token.lifecycle_state = TokenState.FAILED
             return ExecutionResult(

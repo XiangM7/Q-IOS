@@ -106,3 +106,5 @@ class PipelineOutcome(BaseModel):
     final_patch: str | None = None
     recovery_performed: bool = False
     failure_reason: str | None = None
+    control_metrics: dict[str, int] = Field(default_factory=dict)
+    control_metadata: dict[str, Any] = Field(default_factory=dict)

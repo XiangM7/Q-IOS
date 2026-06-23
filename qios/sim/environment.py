@@ -4,7 +4,7 @@ import random
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
-from qios.models import PatchType, TaskRequest
+from qios.models import PatchType
 
 
 class PatchHealth(BaseModel):
@@ -18,8 +18,8 @@ class PatchHealth(BaseModel):
 
     @property
     def routing_score(self) -> float:
-        quarantine_penalty = 0.45 if self.quarantined else 0.0
-        return self.health_score - self.congestion_score - quarantine_penalty
+        quarantine_penalty = 0.2 if self.quarantined else 0.0
+        return self.health_score - (self.congestion_score * 0.6) - quarantine_penalty
 
 
 class SimulationEnvironment(BaseModel):
@@ -31,7 +31,7 @@ class SimulationEnvironment(BaseModel):
     congestion_rate: float = 0.0
     base_latency_ms: float = 20.0
     latency_jitter_ms: float = 5.0
-    quarantine_threshold: int = 3
+    quarantine_threshold: int = 6
     seed: int | None = None
     patches: dict[str, PatchHealth] = Field(default_factory=dict)
 
@@ -42,56 +42,51 @@ class SimulationEnvironment(BaseModel):
         if not self.patches:
             self.patches = self._initialize_patches()
 
+    def prepare_attempt(self, patch_id: str) -> tuple[float, bool]:
+        patch = self.patches[patch_id]
+        self._refresh_congestion(patch)
+        congestion_event = self._rng.random() < min(
+            0.95, self.congestion_rate * (0.5 + patch.congestion_score * 0.5)
+        )
+        latency_ms = self.sample_latency_ms(patch_id)
+        if congestion_event:
+            latency_ms = round(latency_ms * 1.12, 3)
+        return latency_ms, congestion_event
+
     def sample_latency_ms(self, patch_id: str | None = None) -> float:
         if patch_id is None:
             jitter = self._rng.uniform(-self.latency_jitter_ms, self.latency_jitter_ms)
             congestion_triggered = self._rng.random() < self.congestion_rate
-            congestion_factor = 1.0 + (self.congestion_rate if congestion_triggered else 0.0)
+            congestion_factor = 1.0 + (self.congestion_rate * 0.4 if congestion_triggered else 0.0)
             latency = (self.base_latency_ms + jitter) * congestion_factor
             return round(max(0.0, latency), 3)
 
         patch = self.patches[patch_id]
-        self._refresh_congestion(patch)
         jitter = self._rng.uniform(-self.latency_jitter_ms, self.latency_jitter_ms)
-        latency_multiplier = 1.0 + patch.congestion_score + (1.0 - patch.health_score) * 0.2
+        latency_multiplier = 1.0 + (patch.congestion_score * 1.4) + ((1.0 - patch.health_score) * 0.12)
         if patch.quarantined:
-            latency_multiplier += 0.15
+            latency_multiplier += 0.08
         latency = (self.base_latency_ms + jitter) * latency_multiplier
         return round(max(0.0, latency), 3)
 
-    def should_inject_failure(self) -> bool:
-        return self._rng.random() < self.failure_rate
+    def sample_fallback_failure(self) -> bool:
+        return self._rng.random() < self.fallback_failure_rate
 
-    def failure_probability(
-        self,
-        task: TaskRequest,
-        patch_id: str,
-        *,
-        is_fallback: bool = False,
-    ) -> float:
+    def sample_congestion_failure(self, patch_id: str, congestion_event: bool) -> bool:
+        if not congestion_event:
+            return False
         patch = self.patches[patch_id]
-        objective = task.objective.lower()
+        chance = min(0.12, 0.01 + (patch.congestion_score * 0.05) + (self.congestion_rate * 0.03))
+        return self._rng.random() < chance
 
-        if "fail" in objective:
-            objective_risk = 0.08 if is_fallback else 0.72
-        else:
-            objective_risk = 0.03
-
-        fallback_risk = self.fallback_failure_rate if is_fallback else 0.0
-        health_risk = (1.0 - patch.health_score) * (0.32 if is_fallback else 0.6)
-        congestion_risk = patch.congestion_score * (0.22 if is_fallback else 0.4)
-        quarantine_risk = 0.08 if is_fallback else 0.2
-        if not patch.quarantined:
-            quarantine_risk = 0.0
-        constraint_risk = 0.1 if task.constraints.get("sandbox_required") and patch.patch_type == PatchType.HUMAN_REVIEW.value else 0.0
-
-        return min(
-            0.98,
-            max(
-                0.01,
-                objective_risk + fallback_risk + health_risk + congestion_risk + quarantine_risk + constraint_risk,
-            ),
-        )
+    def sample_patch_degradation_failure(self, patch_id: str) -> bool:
+        patch = self.patches[patch_id]
+        chance = 0.0
+        if patch.health_score < 0.55:
+            chance += (0.55 - patch.health_score) * 0.08
+        if patch.quarantined:
+            chance += 0.03
+        return self._rng.random() < min(0.12, chance)
 
     def register_patch_outcome(self, patch_id: str, *, success: bool) -> bool:
         patch = self.patches[patch_id]
@@ -99,14 +94,14 @@ class SimulationEnvironment(BaseModel):
 
         if success:
             patch.success_count += 1
-            patch.health_score = round(min(1.0, patch.health_score + 0.05), 3)
-            patch.congestion_score = round(max(0.0, patch.congestion_score - 0.06), 3)
-            if patch.quarantined and patch.health_score >= 0.8 and patch.success_count > patch.failure_count:
+            patch.health_score = round(min(1.0, patch.health_score + 0.02), 3)
+            patch.congestion_score = round(max(0.0, patch.congestion_score - 0.03), 3)
+            if patch.quarantined and patch.health_score >= 0.72 and patch.success_count > patch.failure_count:
                 patch.quarantined = False
         else:
             patch.failure_count += 1
-            patch.health_score = round(max(0.0, patch.health_score - (0.16 + patch.congestion_score * 0.12)), 3)
-            patch.congestion_score = round(min(1.0, patch.congestion_score + 0.14 + self.congestion_rate * 0.24), 3)
+            patch.health_score = round(max(0.0, patch.health_score - 0.045), 3)
+            patch.congestion_score = round(min(1.0, patch.congestion_score + 0.05 + self.congestion_rate * 0.1), 3)
             if not patch.quarantined and patch.failure_count >= self.quarantine_threshold:
                 patch.quarantined = True
                 just_quarantined = True
@@ -161,7 +156,6 @@ class SimulationEnvironment(BaseModel):
             PatchType.SANDBOX.value,
             PatchType.ANALYSIS.value,
             PatchType.FALLBACK.value,
-            PatchType.FALLBACK.value,
             PatchType.HUMAN_REVIEW.value,
         ]
         patches: dict[str, PatchHealth] = {}
@@ -172,13 +166,16 @@ class SimulationEnvironment(BaseModel):
             patches[patch_id] = PatchHealth(
                 patch_id=patch_id,
                 patch_type=patch_type,
-                health_score=round(0.78 + self._rng.random() * 0.18, 3),
-                congestion_score=round(min(1.0, max(0.0, self.congestion_rate * 0.5 + self._rng.random() * 0.1)), 3),
+                health_score=round(0.82 + self._rng.random() * 0.14, 3),
+                congestion_score=round(
+                    min(1.0, max(0.0, self.congestion_rate * 0.35 + self._rng.random() * 0.06)),
+                    3,
+                ),
             )
 
         return patches
 
     def _refresh_congestion(self, patch: PatchHealth) -> None:
-        delta = self._rng.uniform(-0.08, 0.12)
-        blended = patch.congestion_score * 0.6 + self.congestion_rate * 0.4 + delta
+        delta = self._rng.uniform(-0.03, 0.04)
+        blended = (patch.congestion_score * 0.75) + (self.congestion_rate * 0.25) + delta
         patch.congestion_score = round(min(1.0, max(0.0, blended)), 3)

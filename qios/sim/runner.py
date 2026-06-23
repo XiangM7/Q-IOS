@@ -16,7 +16,7 @@ from qios.sim.baselines import (
 from qios.sim.environment import SimulationEnvironment
 from qios.sim.metrics import SimulationMetrics
 from qios.sim.report import write_metrics_csv, write_report_markdown, write_summary_json
-from qios.sim.workload import WorkloadGenerator
+from qios.sim.workload import WorkloadGenerator, summarize_workload
 
 app = typer.Typer(name="qios-sim", help="Run Q-IOS simulation benchmarks.")
 console = Console()
@@ -25,6 +25,7 @@ console = Console()
 @dataclass
 class SimulationRunResult:
     settings: dict[str, object]
+    workload_debug: dict[str, int]
     metrics: list[SimulationMetrics]
     output_dir: Path
 
@@ -106,6 +107,8 @@ def run_simulation(
         policy_invalid_ratio=policy_invalid_ratio,
         seed=seed,
     ).generate()
+    workload_debug = summarize_workload(workload)
+
     environment_template = SimulationEnvironment(
         patch_count=patch_count,
         failure_rate=failure_rate,
@@ -148,20 +151,25 @@ def run_simulation(
     }
 
     write_metrics_csv(resolved_output_dir, metrics)
-    write_summary_json(resolved_output_dir, settings, metrics)
-    write_report_markdown(resolved_output_dir, settings, metrics)
+    write_summary_json(resolved_output_dir, settings, workload_debug, metrics)
+    write_report_markdown(resolved_output_dir, settings, workload_debug, metrics)
 
-    return SimulationRunResult(settings=settings, metrics=metrics, output_dir=resolved_output_dir)
+    return SimulationRunResult(
+        settings=settings,
+        workload_debug=workload_debug,
+        metrics=metrics,
+        output_dir=resolved_output_dir,
+    )
 
 
 @app.command()
 def main(
     tasks: int = typer.Option(100, "--tasks", min=1, help="Number of synthetic tasks to generate."),
-    failure_rate: float = typer.Option(0.1, "--failure-rate", min=0.0, max=1.0, help="Failure rate used for workload generation and route injection."),
-    fallback_failure_rate: float = typer.Option(0.0, "--fallback-failure-rate", min=0.0, max=1.0, help="Probability that fallback execution also fails."),
+    failure_rate: float = typer.Option(0.1, "--failure-rate", min=0.0, max=1.0, help="Failure rate used for primary execution pressure in the generated workload."),
+    fallback_failure_rate: float = typer.Option(0.0, "--fallback-failure-rate", min=0.0, max=1.0, help="Probability that explicit fallback execution fails."),
     no_fallback_ratio: float = typer.Option(0.0, "--no-fallback-ratio", min=0.0, max=1.0, help="Fraction of tasks generated without a fallback patch."),
     policy_invalid_ratio: float = typer.Option(0.0, "--policy-invalid-ratio", min=0.0, max=1.0, help="Fraction of tasks intentionally generated as policy-invalid."),
-    congestion_rate: float = typer.Option(0.1, "--congestion-rate", min=0.0, max=1.0, help="Congestion level applied to route latency and success."),
+    congestion_rate: float = typer.Option(0.1, "--congestion-rate", min=0.0, max=1.0, help="Congestion level applied primarily to route latency and mildly to failure."),
     max_reroutes: int = typer.Option(1, "--max-reroutes", min=0, help="Maximum reroute attempts per Q-IOS task."),
     systems: str = typer.Option("qios,direct,retry_only,static", "--systems", help="Comma-separated systems to compare."),
     seed: int | None = typer.Option(42, "--seed", help="Seed for deterministic workload and environment sampling."),

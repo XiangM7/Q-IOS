@@ -1,7 +1,7 @@
 import pytest
 
 from qios.sim.metrics import SimulationMetrics
-from qios.sim.workload import WorkloadGenerator
+from qios.sim.workload import WorkloadGenerator, summarize_workload
 
 
 def test_workload_generation_is_deterministic_with_seed() -> None:
@@ -28,6 +28,23 @@ def test_workload_generation_is_deterministic_with_seed() -> None:
     workload_two = [task.model_dump(mode="json") for task in generator_two.generate()]
 
     assert workload_one == workload_two
+
+
+def test_workload_summary_counts_generated_flags() -> None:
+    tasks = WorkloadGenerator(
+        num_tasks=1000,
+        failure_rate=0.3,
+        sandbox_ratio=0.5,
+        high_priority_ratio=0.3,
+        no_fallback_ratio=0.1,
+        policy_invalid_ratio=0.05,
+        seed=42,
+    ).generate()
+    summary = summarize_workload(tasks)
+
+    assert 250 <= summary["generated_failure_tasks"] <= 350
+    assert 30 <= summary["generated_policy_invalid_tasks"] <= 70
+    assert 70 <= summary["generated_no_fallback_tasks"] <= 130
 
 
 def test_metrics_compute_completion_rate_correctly() -> None:

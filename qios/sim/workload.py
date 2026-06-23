@@ -30,21 +30,23 @@ class WorkloadGenerator:
         seed_tag = self.seed if self.seed is not None else "default"
 
         for index in range(self.num_tasks):
-            should_fail = self._rng.random() < self.failure_rate
+            primary_failure = self._rng.random() < self.failure_rate
             sandbox_required = self._rng.random() < self.sandbox_ratio
             high_priority = self._rng.random() < self.high_priority_ratio
             has_no_fallback = self._rng.random() < self.no_fallback_ratio
             policy_invalid = self._rng.random() < self.policy_invalid_ratio
-            use_analysis_objective = self._rng.random() < 0.5 and not should_fail
+            use_analysis_objective = self._rng.random() < 0.5
 
-            if should_fail:
-                objective = f"run fail simulation for workload item {index}"
-            elif use_analysis_objective:
-                objective = f"analyze generated workload item {index}"
-            else:
-                objective = f"run generated workload item {index}"
+            objective = (
+                f"analyze generated workload item {index}"
+                if use_analysis_objective
+                else f"run generated workload item {index}"
+            )
 
-            constraints: dict[str, object] = {"sandbox_required": sandbox_required}
+            constraints: dict[str, object] = {
+                "sandbox_required": sandbox_required,
+                "sim_primary_failure": primary_failure,
+            }
             priority = self._rng.randint(8, 10) if high_priority else self._rng.randint(3, 7)
 
             if policy_invalid:
@@ -59,7 +61,6 @@ class WorkloadGenerator:
                     objective = f"run invalid sandbox workload item {index}"
                     constraints["sandbox_required"] = True
                     constraints["force_invalid_patch_hint"] = True
-
                 constraints["policy_invalid_reason"] = invalid_mode
 
             tasks.append(
@@ -73,3 +74,18 @@ class WorkloadGenerator:
             )
 
         return tasks
+
+
+def summarize_workload(tasks: list[TaskRequest]) -> dict[str, int]:
+    return {
+        "generated_failure_tasks": sum(
+            bool(task.constraints.get("sim_primary_failure")) for task in tasks
+        ),
+        "generated_policy_invalid_tasks": sum(
+            task.priority < 0
+            or task.priority > 10
+            or bool(task.constraints.get("force_invalid_patch_hint"))
+            for task in tasks
+        ),
+        "generated_no_fallback_tasks": sum(task.fallback is None for task in tasks),
+    }
