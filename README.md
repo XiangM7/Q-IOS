@@ -34,6 +34,22 @@ python -m qios.main events TASK_ID
 python -m qios.main reset-state
 ```
 
+## Simulation and Benchmarking
+
+```bash
+python -m qios.sim.runner --tasks 100 --failure-rate 0.1 --systems qios,direct,retry_only,static --seed 42
+```
+
+This benchmark runs one shared synthetic workload across Q-IOS and baseline systems, then compares completion rate, recovery success rate, latency, full restarts, reroutes, and policy rejections.
+
+The latest benchmark artifacts are written under:
+
+```text
+runs/latest/metrics.csv
+runs/latest/summary.json
+runs/latest/report.md
+```
+
 ## Test
 
 ```bash
