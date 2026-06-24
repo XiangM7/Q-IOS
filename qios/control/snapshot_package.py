@@ -15,6 +15,10 @@ class SnapshotPackage(BaseModel):
     task_id: str
     token_id: str
     patch_id: str
+    virtual_patch_id: str | None = None
+    physical_patch_id: str | None = None
+    route_id: str | None = None
+    dispatch_id: str | None = None
     token_state: str
     phi_modulation: float
     rollback_anchor_id: str | None = None
@@ -32,12 +36,20 @@ class SnapshotPackageBuilder:
         rollback_anchor_id: str | None = None,
         replay_lineage: list[str] | None = None,
         memory_isolation_label: str = "default",
+        virtual_patch_id: str | None = None,
+        physical_patch_id: str | None = None,
+        route_id: str | None = None,
+        dispatch_id: str | None = None,
         metadata: dict[str, object] | None = None,
     ) -> SnapshotPackage:
         return SnapshotPackage(
             task_id=token.task_id,
             token_id=token.token_id,
             patch_id=patch_id,
+            virtual_patch_id=virtual_patch_id,
+            physical_patch_id=physical_patch_id or patch_id,
+            route_id=route_id,
+            dispatch_id=dispatch_id,
             token_state=token.lifecycle_state.value,
             phi_modulation=token.phi_modulation,
             rollback_anchor_id=rollback_anchor_id,

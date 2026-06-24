@@ -38,6 +38,23 @@ class SimulationMetrics:
     rollback_anchors_created: int = 0
     replay_ledger_events: int = 0
     local_reentry_count: int = 0
+    health_score_updates: int = 0
+    telemetry_events: int = 0
+    recovery_policy_decisions: int = 0
+    recovery_policy_reroutes: int = 0
+    recovery_policy_fallbacks: int = 0
+    recovery_policy_failures: int = 0
+    virtual_patches_created: int = 0
+    routes_evaluated: int = 0
+    dispatch_packets_created: int = 0
+    remap_attempts: int = 0
+    remap_successes: int = 0
+    remap_failures: int = 0
+    route_score_total: float = 0.0
+    route_score_count: int = 0
+    health_score_total: float = 0.0
+    health_score_count: int = 0
+    quarantined_patch_count: int = 0
     total_latency_ms: float = 0.0
     latencies_ms: list[float] = field(default_factory=list)
 
@@ -82,6 +99,26 @@ class SimulationMetrics:
         self.rollback_anchors_created += control_metrics.get("rollback_anchors_created", 0)
         self.replay_ledger_events += control_metrics.get("replay_ledger_events", 0)
         self.local_reentry_count += control_metrics.get("local_reentry_count", 0)
+        self.health_score_updates += control_metrics.get("health_score_updates", 0)
+        self.telemetry_events += control_metrics.get("telemetry_events", 0)
+        self.recovery_policy_decisions += control_metrics.get("recovery_policy_decisions", 0)
+        self.recovery_policy_reroutes += control_metrics.get("recovery_policy_reroutes", 0)
+        self.recovery_policy_fallbacks += control_metrics.get("recovery_policy_fallbacks", 0)
+        self.recovery_policy_failures += control_metrics.get("recovery_policy_failures", 0)
+        self.virtual_patches_created += control_metrics.get("virtual_patches_created", 0)
+        self.routes_evaluated += control_metrics.get("routes_evaluated", 0)
+        self.dispatch_packets_created += control_metrics.get("dispatch_packets_created", 0)
+        self.remap_attempts += control_metrics.get("remap_attempts", 0)
+        self.remap_successes += control_metrics.get("remap_successes", 0)
+        self.remap_failures += control_metrics.get("remap_failures", 0)
+        self.route_score_total = round(self.route_score_total + control_metrics.get("route_score_total", 0.0), 6)
+        self.route_score_count += control_metrics.get("route_score_count", 0)
+        self.health_score_total = round(self.health_score_total + control_metrics.get("health_score_total", 0.0), 6)
+        self.health_score_count += control_metrics.get("health_score_count", 0)
+        self.quarantined_patch_count = max(
+            self.quarantined_patch_count,
+            control_metrics.get("quarantined_patch_count", 0),
+        )
 
     def record_task(
         self,
@@ -159,6 +196,18 @@ class SimulationMetrics:
         index = max(0, ceil(len(ordered) * 0.95) - 1)
         return ordered[index]
 
+    @property
+    def average_route_score(self) -> float:
+        if self.route_score_count == 0:
+            return 0.0
+        return self.route_score_total / self.route_score_count
+
+    @property
+    def average_health_score(self) -> float:
+        if self.health_score_count == 0:
+            return 0.0
+        return self.health_score_total / self.health_score_count
+
     def to_dict(self) -> dict[str, object]:
         return {
             "system_name": self.system_name,
@@ -193,6 +242,23 @@ class SimulationMetrics:
             "rollback_anchors_created": self.rollback_anchors_created,
             "replay_ledger_events": self.replay_ledger_events,
             "local_reentry_count": self.local_reentry_count,
+            "health_score_updates": self.health_score_updates,
+            "telemetry_events": self.telemetry_events,
+            "recovery_policy_decisions": self.recovery_policy_decisions,
+            "recovery_policy_reroutes": self.recovery_policy_reroutes,
+            "recovery_policy_fallbacks": self.recovery_policy_fallbacks,
+            "recovery_policy_failures": self.recovery_policy_failures,
+            "virtual_patches_created": self.virtual_patches_created,
+            "routes_evaluated": self.routes_evaluated,
+            "dispatch_packets_created": self.dispatch_packets_created,
+            "remap_attempts": self.remap_attempts,
+            "remap_successes": self.remap_successes,
+            "remap_failures": self.remap_failures,
+            "route_score_total": round(self.route_score_total, 6),
+            "route_score_count": self.route_score_count,
+            "health_score_total": round(self.health_score_total, 6),
+            "health_score_count": self.health_score_count,
+            "quarantined_patch_count": self.quarantined_patch_count,
             "total_latency_ms": round(self.total_latency_ms, 3),
             "latencies_ms": list(self.latencies_ms),
             "completion_rate": round(self.completion_rate, 4),
@@ -201,4 +267,6 @@ class SimulationMetrics:
             "recovery_success_rate": round(self.recovery_success_rate, 4),
             "average_latency_ms": round(self.average_latency_ms, 3),
             "p95_latency_ms": round(self.p95_latency_ms, 3),
+            "average_route_score": round(self.average_route_score, 4),
+            "average_health_score": round(self.average_health_score, 4),
         }

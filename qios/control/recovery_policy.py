@@ -101,7 +101,7 @@ class RecoveryPolicyEngine:
                 },
             )
 
-        if token.metadata.get("rollback_anchor_id"):
+        if token.metadata.get("rollback_anchor_id") and (best_patch_id or fallback_patch_id):
             return RecoveryDecision(
                 action=RecoveryAction.LOCAL_REENTRY,
                 reason="No healthy route available; attempting bounded local re-entry from rollback anchor.",
@@ -112,7 +112,7 @@ class RecoveryPolicyEngine:
                 metadata={"failed_patch_health": failed_score.health_score},
             )
 
-        if token.metadata.get("replay_lineage"):
+        if token.metadata.get("replay_lineage") and (best_patch_id or fallback_patch_id):
             return RecoveryDecision(
                 action=RecoveryAction.SNAPSHOT_RESTORE,
                 reason="No healthy route available; using snapshot-style replay continuity.",

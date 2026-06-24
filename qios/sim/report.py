@@ -43,6 +43,25 @@ def write_metrics_csv(output_dir: Path, metrics: list[SimulationMetrics]) -> Pat
         "rollback_anchors_created",
         "replay_ledger_events",
         "local_reentry_count",
+        "health_score_updates",
+        "telemetry_events",
+        "recovery_policy_decisions",
+        "recovery_policy_reroutes",
+        "recovery_policy_fallbacks",
+        "recovery_policy_failures",
+        "virtual_patches_created",
+        "routes_evaluated",
+        "dispatch_packets_created",
+        "remap_attempts",
+        "remap_successes",
+        "remap_failures",
+        "route_score_total",
+        "route_score_count",
+        "health_score_total",
+        "health_score_count",
+        "average_route_score",
+        "average_health_score",
+        "quarantined_patch_count",
         "total_latency_ms",
         "completion_rate",
         "runtime_failure_rate",
@@ -193,9 +212,41 @@ def _build_report(
     lines.extend(
         [
             "",
+            "## NP3 / NP4 Control Plane Counters",
+            "",
+            "| System | Health Score Updates | Telemetry Events | Recovery Policy Decisions | Recovery Policy Reroutes | Recovery Policy Fallbacks | Recovery Policy Failures | Virtual Patches Created | Routes Evaluated | Dispatch Packets Created | Remap Attempts | Remap Successes | Remap Failures | Average Route Score | Average Health Score | Quarantined Patch Count |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
+    for item in metrics:
+        lines.append(
+            "| "
+            f"{item.system_name} | "
+            f"{item.health_score_updates} | "
+            f"{item.telemetry_events} | "
+            f"{item.recovery_policy_decisions} | "
+            f"{item.recovery_policy_reroutes} | "
+            f"{item.recovery_policy_fallbacks} | "
+            f"{item.recovery_policy_failures} | "
+            f"{item.virtual_patches_created} | "
+            f"{item.routes_evaluated} | "
+            f"{item.dispatch_packets_created} | "
+            f"{item.remap_attempts} | "
+            f"{item.remap_successes} | "
+            f"{item.remap_failures} | "
+            f"{item.average_route_score:.3f} | "
+            f"{item.average_health_score:.3f} | "
+            f"{item.quarantined_patch_count} |"
+        )
+
+    lines.extend(
+        [
+            "",
             "## Interpretation",
             "",
             _build_interpretation(metrics, workload_debug),
+            "",
+            "HealthScore and Telemetry implement health-score-driven runtime recovery. VirtualPatch preserves logical execution identity while physical patches change. RouteEvaluator implements survivability-aware route selection. DispatchPacket represents the control-plane handoff to the execution fabric. Remapper enables continuity-preserving recovery after degraded or failed patches.",
             "",
             "## Notes",
             "",

@@ -16,6 +16,9 @@ class ReplayLedgerEvent(BaseModel):
     token_id: str
     event_type: str
     patch_id: str | None = None
+    virtual_patch_id: str | None = None
+    route_id: str | None = None
+    dispatch_id: str | None = None
     token_state: str | None = None
     message: str = ""
     metadata: dict[str, object] = Field(default_factory=dict)
@@ -36,6 +39,9 @@ class ReplayLedger:
         token_id: str,
         event_type: str,
         patch_id: str | None = None,
+        virtual_patch_id: str | None = None,
+        route_id: str | None = None,
+        dispatch_id: str | None = None,
         token_state: str | None = None,
         message: str = "",
         metadata: dict[str, object] | None = None,
@@ -45,6 +51,9 @@ class ReplayLedger:
             token_id=token_id,
             event_type=event_type,
             patch_id=patch_id,
+            virtual_patch_id=virtual_patch_id,
+            route_id=route_id,
+            dispatch_id=dispatch_id,
             token_state=token_state,
             message=message,
             metadata=metadata or {},
