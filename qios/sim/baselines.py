@@ -198,7 +198,8 @@ class RetryOnlyBaseline(BaseSimulationSystem):
             )
 
         return metrics
-
+    
+# NP1 最核心运行函数
 
 class StaticRoutingBaseline(BaseSimulationSystem):
     system_name = "static"
@@ -256,7 +257,7 @@ class StaticRoutingBaseline(BaseSimulationSystem):
 
         return metrics
 
-
+# NP1 主流程接线
 class QIOSSimulationSystem(BaseSimulationSystem):
     system_name = "qios"
 

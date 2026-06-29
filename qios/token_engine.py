@@ -1,9 +1,14 @@
+# job → ϕ-token
+
 from __future__ import annotations
 
 from qios.models import PatchType, PhiToken, StructuredJobModel, TokenState
 
 
 class PhiTokenEngine:
+    # 从 StructuredJob 里提取 role，根据 role 和 constraints 推断 patch_hint。
+    # 根据 priority 生成 phi_modulation。
+    # 然后创建 PhiToken。
     def create_token(self, structured_job: StructuredJobModel) -> PhiToken:
         role = structured_job.roles[0] if structured_job.roles else "default_execution"
         patch_hint = self._infer_patch_hint(role, structured_job.constraints)

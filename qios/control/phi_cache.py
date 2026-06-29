@@ -1,3 +1,5 @@
+# ϕ-cache feedback
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -8,7 +10,7 @@ from pydantic import BaseModel, Field
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
-
+# 记录某个 patch 在某个 role 下的历史表现
 class PhiCacheEntry(BaseModel):
     patch_id: str
     role: str
@@ -35,7 +37,8 @@ class PhiCache:
         if key not in self._entries:
             self._entries[key] = PhiCacheEntry(patch_id=patch_id, role=role)
         return self._entries[key]
-
+    
+    # 成功和失败，不断累积叠加概率
     def update_success(
         self,
         patch_id: str,
@@ -72,6 +75,7 @@ class PhiCache:
         self._recompute_preference(entry)
         return entry
 
+    # 根据使用频率，判断route可靠程度，进行动态调整
     def update_reroute(self, patch_id: str, role: str) -> PhiCacheEntry:
         entry = self.get_entry(patch_id, role)
         entry.reroute_count += 1
@@ -84,7 +88,8 @@ class PhiCache:
     def rank_patches(self, patch_ids: list[str], role: str) -> list[tuple[str, float]]:
         ranked = [(patch_id, self.get_preference_score(patch_id, role)) for patch_id in patch_ids]
         return sorted(ranked, key=lambda item: (-item[1], item[0]))
-
+    
+    # online weighted feedback scoring algorithm
     def _recompute_preference(self, entry: PhiCacheEntry) -> None:
         score = 0.5
         score += min(0.28, entry.success_count * 0.05)

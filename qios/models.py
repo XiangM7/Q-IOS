@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -50,7 +51,7 @@ class StructuredJobModel(BaseModel):
     priority: int
     fallback: str | None = None
 
-
+# 定义 PhiToken
 class PhiToken(BaseModel):
     token_id: str = Field(default_factory=lambda: str(uuid4()))
     task_id: str
