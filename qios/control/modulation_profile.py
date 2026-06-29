@@ -36,7 +36,7 @@ class ModulationProfileGenerator:
         patch_congestion: dict[str, float] | None = None,
     ) -> ModulationProfile:
         scores: list[PatchModulationScore] = []
-
+        # weighted multi-factor patch scoring algorithm
         for patch_id in candidate_patch_ids:
             role_score = self._role_score(token, patch_id)
             priority_score = min(1.0, max(0.0, token.priority / 10))
@@ -68,7 +68,7 @@ class ModulationProfileGenerator:
                     ),
                 )
             )
-
+        # 排序后，选最高分
         ordered = sorted(scores, key=lambda item: (-item.final_score, item.patch_id))
         return ModulationProfile(
             token_id=token.token_id,

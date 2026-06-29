@@ -25,7 +25,7 @@ class ArbitrationResult(BaseModel):
     score: float
     alternative_patch_id: str | None = None
 
-
+# threshold-based local arbitration algorithm
 class PatchLocalArbitrator:
     def arbitrate(
         self,
