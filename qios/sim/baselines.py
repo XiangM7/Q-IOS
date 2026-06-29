@@ -265,6 +265,8 @@ class QIOSSimulationSystem(BaseSimulationSystem):
         super().__init__(environment)
         self.max_reroutes = max_reroutes
         self.generator = StructuredJobGenerator()
+        # These components implement the NP1 phi-token, phi-cache,
+        # modulation profile, and patch-local arbitration path.
         self.token_engine = PhiTokenEngine()
         self.policy_engine = PolicyEngine()
         self.scheduler = Scheduler()
@@ -292,6 +294,9 @@ class QIOSSimulationSystem(BaseSimulationSystem):
         for task in tasks:
             control_metrics = self._empty_control_metrics()
             task_copy = task.model_copy(deep=True)
+            # NP1 FIG. 2 / Operations 205, 210, 215:
+            # The task becomes a structured job and then a phi-token carrying
+            # metadata, role, patch hint, priority, fallback, and phi_modulation.
             structured_job = self.generator.generate(task_copy)
             token = self.token_engine.create_token(structured_job)
             self._sync_patch_registry()
@@ -367,6 +372,9 @@ class QIOSSimulationSystem(BaseSimulationSystem):
                 )
                 continue
 
+            # NP1 FIG. 2 / Operation 245 and FIG. 3 / Operations 305-330:
+            # The modulation profile is sent to patch-local arbitration,
+            # which accepts or reroutes the selected patch.
             primary_alternative = self._select_recovery_patch(task_copy, token, {primary_patch.patch_id})
             primary_patch, primary_arbitration = self._select_patch_with_control(
                 token=token,
@@ -516,6 +524,8 @@ class QIOSSimulationSystem(BaseSimulationSystem):
             while reroutes < self.max_reroutes:
                 reroutes += 1
                 self._increment_control(control_metrics, "local_reentry_count")
+                # NP1 FIG. 4 / Operation 445:
+                # Reroute history feeds later patch selection.
                 self.phi_cache.update_reroute(failed_physical_patch_id, token.role)
                 self._increment_control(control_metrics, "phi_cache_updates")
 
@@ -1068,6 +1078,15 @@ class QIOSSimulationSystem(BaseSimulationSystem):
         )
         return dispatch_packet
 
+    # This is the main NP1 runtime implementation point.
+    # FIG. 2 / Operation 222 checks whether cached affinity data exists.
+    # FIG. 2 / Operation 220 accesses phi-cache state.
+    # FIG. 2 / Operation 225 encodes token fields into patch-indexed modulation values.
+    # FIG. 2 / Operation 230 assembles the patch-indexed modulation profile.
+    # FIG. 2 / Operation 245 outputs that profile to patch-local arbitration logic.
+    # FIG. 3 / Operations 305-330 apply local arbitration over candidate patches.
+    # It does not perform a global softmax over all paths; it performs local
+    # candidate scoring and threshold-based arbitration.
     def _select_patch_with_control(
         self,
         *,
@@ -1081,9 +1100,13 @@ class QIOSSimulationSystem(BaseSimulationSystem):
             candidates.append(alternative_patch)
 
         candidate_ids = [patch.patch_id for patch in candidates]
+        # NP1 FIG. 2 / Decision 222 and Operation 220:
+        # Checks whether phi-cache affinity history exists before scoring.
         if any(self.phi_cache.get_entry(patch_id, token.role).has_history for patch_id in candidate_ids):
             self._increment_control(control_metrics, "phi_cache_hits")
 
+        # NP1 FIG. 2 / Operations 225 and 230:
+        # Encodes token fields into candidate modulation values and assembles the profile.
         profile = self.modulation_generator.generate(
             token,
             candidate_patch_ids=candidate_ids,
@@ -1097,9 +1120,11 @@ class QIOSSimulationSystem(BaseSimulationSystem):
             token,
             event_type="modulation_profile_generated",
             patch_id=profile.selected_patch_id,
-            message="Generated modulation profile for candidate patches.",
-            metadata={"scores": [score.model_dump(mode="json") for score in profile.patch_scores]},
-        )
+                message="Generated modulation profile for candidate patches.",
+                metadata={"scores": [score.model_dump(mode="json") for score in profile.patch_scores]},
+            )
+        # NP1 FIG. 2 / Operation 245 and FIG. 3 / Operations 305-320:
+        # Sends the selected local candidate set to patch-local arbitration.
         arbitration = self.arbitrator.arbitrate(
             token,
             profile,
@@ -1107,6 +1132,8 @@ class QIOSSimulationSystem(BaseSimulationSystem):
             patch_congestion={patch.patch_id: patch.congestion_score for patch in candidates},
             quarantined_patches={patch.patch_id for patch in candidates if patch.quarantined},
         )
+        # NP1 FIG. 3 / Operations 325 and 330:
+        # Records which local arbitration action was taken.
         if arbitration.decision == ArbitrationDecision.ACCEPT:
             self._increment_control(control_metrics, "arbitration_accepts")
         elif arbitration.decision == ArbitrationDecision.REJECT:
@@ -1118,6 +1145,8 @@ class QIOSSimulationSystem(BaseSimulationSystem):
 
         selected_patch_id = profile.selected_patch_id or preferred_patch.patch_id
         if arbitration.decision != ArbitrationDecision.ACCEPT and arbitration.alternative_patch_id is not None:
+            # NP1 FIG. 3 / Operation 325b:
+            # Local reroute selects the alternative candidate patch.
             selected_patch_id = arbitration.alternative_patch_id
 
         selected_patch = next(
@@ -1193,6 +1222,10 @@ class QIOSSimulationSystem(BaseSimulationSystem):
 
         return None
 
+    # NP1 FIG. 3 / Operations 345 and 350:
+    # Execution produces outcome data and routes it into the feedback path.
+    # NP1 FIG. 4 / Operations 405-450:
+    # Outcome data updates phi-cache and later modulation behavior.
     def _execute_attempt(
         self,
         *,
@@ -1287,6 +1320,8 @@ class QIOSSimulationSystem(BaseSimulationSystem):
             self._record_health_metric(control_metrics, health_score.health_score)
             self.patch_registry.update_health(physical_patch.patch_id, health_score.health_score)
             self.patch_registry.update_congestion(physical_patch.patch_id, environment_patch.congestion_score)
+            # NP1 FIG. 4 / Operation 440:
+            # Failure decays affinity / marks a failed route for later modulation.
             self.phi_cache.update_failure(
                 physical_patch.patch_id,
                 token.role,
@@ -1323,6 +1358,8 @@ class QIOSSimulationSystem(BaseSimulationSystem):
             self._record_health_metric(control_metrics, health_score.health_score)
             self.patch_registry.update_health(physical_patch.patch_id, health_score.health_score)
             self.patch_registry.update_congestion(physical_patch.patch_id, environment_patch.congestion_score)
+            # NP1 FIG. 4 / Operation 430:
+            # Success strengthens or preserves affinity for later modulation.
             self.phi_cache.update_success(
                 physical_patch.patch_id,
                 token.role,

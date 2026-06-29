@@ -51,7 +51,14 @@ class StructuredJobModel(BaseModel):
     priority: int
     fallback: str | None = None
 
-# 定义 PhiToken
+# NP1 FIG. 1 / Block 122:
+# Represents one or more phi-tokens that carry the runtime-facing token state.
+# In this prototype, a phi-token packages identity/context metadata, a role tag,
+# execution-localization fields, priority, fallback routing, and a phi-modulation value.
+# `token_id` and `task_id` provide identity/context metadata, `role` is the role tag,
+# `patch_hint`, `assigned_patch`, `priority`, and `fallback` are execution-localization
+# fields, and `phi_modulation` stores the resulting modulation value.
+# 定义 PhiToken。
 class PhiToken(BaseModel):
     token_id: str = Field(default_factory=lambda: str(uuid4()))
     task_id: str

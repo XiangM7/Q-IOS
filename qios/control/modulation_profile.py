@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field
 from qios.control.phi_cache import PhiCache
 
 
+# NP1 FIG. 2 / Operation 225:
+# Encoded patch-indexed modulation value for one candidate patch.
 class PatchModulationScore(BaseModel):
     patch_id: str
     role_score: float
@@ -18,6 +20,8 @@ class PatchModulationScore(BaseModel):
     reason: str
 
 
+# NP1 FIG. 2 / Operation 230:
+# Assembled patch-indexed modulation profile across candidate patches.
 class ModulationProfile(BaseModel):
     token_id: str
     task_id: str
@@ -27,6 +31,13 @@ class ModulationProfile(BaseModel):
 
 
 class ModulationProfileGenerator:
+    # NP1 FIG. 1 / Block 150:
+    # Patch-indexed modulation profile generator for runtime control.
+    # NP1 FIG. 2 / Operations 225 and 230:
+    # Encodes token fields into patch-indexed modulation values and assembles
+    # the resulting modulation profile from role, priority, phi-cache, health,
+    # and congestion inputs. This implementation uses a deterministic weighted
+    # multi-factor scoring algorithm.
     def generate(
         self,
         token,
@@ -44,6 +55,8 @@ class ModulationProfileGenerator:
             health_score = (patch_health or {}).get(patch_id, 1.0)
             congestion_penalty = (patch_congestion or {}).get(patch_id, 0.0)
 
+            # NP1 FIG. 2 / Operation 225:
+            # Weighted phi-to-patch modulation score.
             final_score = (
                 (role_score * 0.45)
                 + (priority_score * 0.1)
@@ -78,6 +91,7 @@ class ModulationProfileGenerator:
             selected_patch_id=ordered[0].patch_id if ordered else None,
         )
 
+    # Role-conditioned patch affinity used as part of phi-modulation.
     def _role_score(self, token, patch_id: str) -> float:
         patch_name = patch_id.lower()
         sandbox_required = bool(token.metadata.get("constraints", {}).get("sandbox_required"))

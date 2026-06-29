@@ -9,6 +9,8 @@ from pydantic import BaseModel
 from qios.control.modulation_profile import ModulationProfile, PatchModulationScore
 
 
+# NP1 FIG. 3 / Operation 325:
+# Local arbitration may accept, reject, defer, reroute, or quarantine a token path.
 class ArbitrationDecision(str, Enum):
     ACCEPT = "ACCEPT"
     REJECT = "REJECT"
@@ -27,6 +29,13 @@ class ArbitrationResult(BaseModel):
 
 # threshold-based local arbitration algorithm
 class PatchLocalArbitrator:
+    # NP1 FIG. 1 / Block 170:
+    # Patch-local arbitration logic for the selected local candidate set.
+    # NP1 FIG. 3 / Operations 305, 310, 315, 320, 325, and 330:
+    # Receives a patch-indexed modulation profile, evaluates the relevant local
+    # subset against local arbitration conditions, and chooses accept, defer,
+    # reroute, reject, or quarantine. This implementation uses threshold-based
+    # local arbitration rather than a learned controller.
     def arbitrate(
         self,
         token,
@@ -52,6 +61,7 @@ class PatchLocalArbitrator:
                 alternative_patch_id=alternative_patch_id,
             )
 
+        # Critical patch health triggers quarantine or immediate reroute handling.
         if health < 0.25:
             return ArbitrationResult(
                 token_id=token.token_id,
@@ -62,6 +72,7 @@ class PatchLocalArbitrator:
                 alternative_patch_id=alternative_patch_id,
             )
 
+        # Below-threshold local arbitration rejects this patch unless reroute exists.
         if health < 0.45:
             return ArbitrationResult(
                 token_id=token.token_id,
@@ -72,6 +83,7 @@ class PatchLocalArbitrator:
                 alternative_patch_id=alternative_patch_id,
             )
 
+        # Overload maps to defer or reroute behavior for the local candidate.
         if congestion > 0.85:
             return ArbitrationResult(
                 token_id=token.token_id,
@@ -82,6 +94,7 @@ class PatchLocalArbitrator:
                 alternative_patch_id=alternative_patch_id,
             )
 
+        # Arbitration condition satisfied and the token path is accepted locally.
         if selected_score >= 0.55:
             return ArbitrationResult(
                 token_id=token.token_id,
